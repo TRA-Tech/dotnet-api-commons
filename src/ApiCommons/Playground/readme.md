@@ -1,0 +1,1 @@
+You can utilize the SQL Script provided at this [link](https://github.com/microsoft/sql-server-samples/blob/master/samples/databases/northwind-pubs/instnwnd.sql) to create the database on your local machine.
