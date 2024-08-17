@@ -4,7 +4,7 @@ namespace ApiCommons.GeneralResponse
 {
     public class BaseController : ControllerBase
     {
-        [Obsolete("You can use ToActionResult method in Result<T>")]
+        [Obsolete("You can use ToActionResult method in Response<T>")]
         [NonAction]
 
         public IActionResult CreateResult<T>(Response<T> response)
