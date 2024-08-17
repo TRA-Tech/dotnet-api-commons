@@ -5,6 +5,7 @@ using ApiCommons.Middlewares.DbTransaction;
 using Microsoft.EntityFrameworkCore;
 using Playground.Entities;
 using System.Net;
+using Playground.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,8 +15,11 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<NorthwindDbContext>(options =>
 {
-    options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=northwind;Trusted_Connection=True;");
+    options.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=northwind;Trusted_Connection=True;");
 });
+
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+
 
 var app = builder.Build();
 
