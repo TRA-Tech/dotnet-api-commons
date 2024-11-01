@@ -11,12 +11,22 @@
         private readonly TError? _error;
 
         /// <summary>
-        /// Gets a value indicating whether the result is an error.
+        /// Gets the success value of the result, if present. This property is null when the result represents a failure.
         /// </summary>
-        public bool IsError { get => _error is null; }
+        public TValue? Value { get { return _value; } }
 
         /// <summary>
-        /// Gets a value indicating whether the result is a success.
+        /// Gets the error value of the result, if present. This property is null when the result represents a success.
+        /// </summary>
+        public TError? Error { get { return _error; } }
+
+        /// <summary>
+        /// Gets a value indicating whether the result is an error. Returns true if the result contains an error, otherwise false.
+        /// </summary>
+        public bool IsError { get => _error is not null; }
+
+        /// <summary>
+        /// Gets a value indicating whether the result is a success. Returns true if the result is successful and contains a value, otherwise false.
         /// </summary>
         public bool IsSuccess { get => !IsError; }
 
@@ -55,17 +65,61 @@
         }
 
         /// <summary>
-        /// Matches the result with a function for success and a function for failure, and returns the result of the matched function.
+        /// Matches the result with the appropriate function based on its state and returns the outcome.
+        /// Ideal for handling operations with distinct success or failure actions.
         /// </summary>
         /// <typeparam name="TResult">The type of the result.</typeparam>
-        /// <param name="success">The function to call if the result is a success.</param>
-        /// <param name="failure">The function to call if the result is a failure.</param>
-        /// <returns>The result of the matched function.</returns>
+        /// <param name="success">Function to execute if the result is a success.</param>
+        /// <param name="failure">Function to execute if the result is a failure.</param>
+        /// <returns>The result of the executed function.</returns>
         public TResult Match<TResult>(
-            Func<TValue?, TResult> success,
+            Func<TValue, TResult> success,
             Func<TError, TResult> failure)
         {
-            return IsError ? success(_value) : failure(_error!);
+            return IsSuccess ? success(_value!) : failure(_error!);
+        }
+
+        /// <summary>
+        /// Asynchronously matches the result with the appropriate async function based on its state, returning a task of the result.
+        /// Useful for async operations needing distinct handling for success or failure.
+        /// </summary>
+        /// <typeparam name="TResult">The type of the async result.</typeparam>
+        /// <param name="success">Async function to execute if the result is successful.</param>
+        /// <param name="failure">Async function to execute if the result is a failure.</param>
+        /// <returns>A ValueTask of the executed function's result.</returns>
+        public ValueTask<TResult> MatchAsync<TResult>(
+            Func<TValue, ValueTask<TResult>> success,
+            Func<TError, ValueTask<TResult>> failure)
+        {
+            return IsSuccess ? success(_value!) : failure(_error!);
+        }
+
+        /// <summary>
+        /// Executes an action based on the result's state. Useful for side effects like logging.
+        /// </summary>
+        /// <param name="success">Action to execute if the result is successful, using the success value.</param>
+        /// <param name="failure">Action to execute if the result is a failure, using the error value.</param>
+        public void Handle(
+            Action<TValue> success,
+            Action<TError> failure)
+        {
+            if (IsSuccess)
+                success(_value!);
+            else
+                failure(_error!);
+        }
+
+        /// <summary>
+        /// Asynchronously executes an action based on the result's state. Ideal for handling side effects that involve async operations.
+        /// </summary>
+        /// <param name="success">Async action to execute if the result is successful, using the success value.</param>
+        /// <param name="failure">Async action to execute if the result is a failure, using the error value.</param>
+        /// <returns>A ValueTask representing the ongoing operation.</returns>
+        public ValueTask HandleAsync(
+            Func<TValue, ValueTask> success,
+            Func<TError, ValueTask> failure)
+        {
+            return IsSuccess ? success(_value!) : failure(_error!);
         }
     }
 

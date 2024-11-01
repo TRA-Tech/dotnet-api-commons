@@ -20,11 +20,15 @@ namespace Playground.Controllers
         public async Task<IActionResult> GetDescriptionById(int id)
         {
             var result = await _categoryService.GetDescriptionById(id);
-            Result<string?, Exception> result2 = "selam";
 
-            Response<string> response = result;
+            Response<string> response = result.Match(
+                s => s,
+                e => string.Empty
+            );
 
-            Response<string?> response2 = result2;
+            await result.MatchAsync(
+                s => ValueTask.FromResult(s),
+                e => ValueTask.FromResult(string.Empty));
 
             return response.ToActionResult();
         }
