@@ -32,32 +32,35 @@ namespace ApiCommons.Middlewares.DbTransaction
         {
             var endpoint = context.Features.Get<IEndpointFeature>()?.Endpoint;
             DbTransactionAttribute? attribute = endpoint?.Metadata.GetMetadata<DbTransactionAttribute>();
-            if (attribute == null)
+            if (attribute is null)
             {
                 await _next(context);
                 return;
             }
 
-            await using var asyncServiceScope = _serviceProvider.CreateAsyncScope();
-            DbContext dbContext = (DbContext)asyncServiceScope.ServiceProvider.GetRequiredService(attribute.DbContextType);
-            if (dbContext == null)
+            var sp = context.RequestServices;
+
+            var dbContextObj = sp.GetService(attribute.DbContextType);
+            if (dbContextObj is not DbContext dbContext)
             {
                 await _next(context);
                 return;
             }
 
-            using var transaction = await dbContext.Database.BeginTransactionAsync();
-
+            await using var tx = await dbContext.Database.BeginTransactionAsync();
             try
             {
                 await _next(context);
-                await transaction.CommitAsync();
+
+                await tx.CommitAsync();
             }
-            catch (Exception exp)
+            catch (Exception ex)
             {
-                await transaction.RollbackAsync();
-                if (_exceptionHandler is not null) await _exceptionHandler(_serviceProvider, context, exp);
-                else throw;
+                await tx.RollbackAsync();
+                if (_exceptionHandler is not null)
+                    await _exceptionHandler(sp, context, ex);
+                else
+                    throw;
             }
         }
     }
