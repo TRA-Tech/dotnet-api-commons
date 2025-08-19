@@ -17,15 +17,8 @@ namespace ApiCommons.Middlewares.DbTransaction
         /// <exception cref="ArgumentNullException">Thrown when the app argument is null.</exception>
         public static IApplicationBuilder UseDbTransaction(this IApplicationBuilder app, Func<IServiceProvider, HttpContext, Exception, Task>? exceptionHandler = null)
         {
-            if (app == null)
-            {
-                throw new ArgumentNullException(nameof(app));
-            }
-
             if (exceptionHandler is not null)
-            {
                 return app.UseMiddleware<DbTransactionMiddleware>(exceptionHandler);
-            }
 
             return app.UseMiddleware<DbTransactionMiddleware>();
         }
