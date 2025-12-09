@@ -1,4 +1,6 @@
-﻿using System.Linq.Expressions;
+﻿using ApiCommons.Pagination;
+using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace ApiCommons.Extensions
 {
@@ -55,6 +57,29 @@ namespace ApiCommons.Extensions
             {
                 return source.ToHashSet();
             });
+        }
+
+        /// <summary>
+        /// Materializes a single page of results from an <see cref="IQueryable{TSource}"/>, returning items and total count.
+        /// Executes two queries against the underlying provider: one for <c>CountAsync</c>, and one for the paged items using
+        /// <c>Skip</c>/<c>Take</c> and <c>ToListAsync</c>.
+        /// </summary>
+        /// <typeparam name="TSource">The element type of the query.</typeparam>
+        /// <param name="source">The queryable source to paginate. Should include any filters/sorts before calling.</param>
+        /// <param name="request">The normalized pagination request providing <c>Skip</c> and <c>PageSize</c>.</param>
+        /// <param name="ct">A <see cref="CancellationToken"/> to observe while awaiting the tasks.</param>
+        /// <returns>A <see cref="PagedResult{TSource}"/> containing the current page items, total count, and paging metadata.</returns>
+        public static async Task<PagedResult<TSource>> ToPagedAsync<TSource>(this IQueryable<TSource> source, PagedRequest request, CancellationToken ct = default)
+        {
+            var total = await source.CountAsync(ct);
+            if (total == 0) return PagedResult<TSource>.Empty(request);
+
+            var items = await source
+                .Skip(request.Skip)
+                .Take(request.PageSize)
+                .ToListAsync(ct);
+
+            return PagedResult<TSource>.From(items, total, request);
         }
     }
 }
