@@ -1,67 +1,41 @@
-﻿using ApiCommons.Attributes;
+using ApiCommons.Attributes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ApiCommons.Middlewares.DbTransaction
+namespace ApiCommons.Middlewares.DbTransaction;
+
+public class DbTransactionMiddleware(RequestDelegate next)
 {
-    /// <summary>
-    /// Middleware for managing database transactions.
-    /// </summary>
-    public class DbTransactionMiddleware
+    public async Task Invoke(HttpContext context)
     {
-        private readonly RequestDelegate _next;
-        private readonly IServiceProvider _serviceProvider;
-        private readonly Func<IServiceProvider, HttpContext, Exception, Task>? _exceptionHandler;
+        var endpoint = context.Features.Get<IEndpointFeature>()?.Endpoint;
+        var attribute = endpoint?.Metadata.GetMetadata<DbTransactionAttribute>();
 
-        public DbTransactionMiddleware(IServiceProvider serviceProvider, RequestDelegate next)
+        if (attribute is null)
         {
-            _next = next;
-            _serviceProvider = serviceProvider;
+            await next(context);
+            return;
         }
 
-        public DbTransactionMiddleware(IServiceProvider serviceProvider, RequestDelegate next, Func<IServiceProvider, HttpContext, Exception, Task> exceptionHandler)
+        var dbContextObj = context.RequestServices.GetService(attribute.DbContextType);
+        if (dbContextObj is not DbContext dbContext)
         {
-            _next = next;
-            _serviceProvider = serviceProvider;
-            _exceptionHandler = exceptionHandler;
+            await next(context);
+            return;
         }
 
-        public async Task Invoke(HttpContext context)
+        await using var tx = await dbContext.Database.BeginTransactionAsync();
+        try
         {
-            var endpoint = context.Features.Get<IEndpointFeature>()?.Endpoint;
-            DbTransactionAttribute? attribute = endpoint?.Metadata.GetMetadata<DbTransactionAttribute>();
-            if (attribute is null)
-            {
-                await _next(context);
-                return;
-            }
-
-            var sp = context.RequestServices;
-
-            var dbContextObj = sp.GetService(attribute.DbContextType);
-            if (dbContextObj is not DbContext dbContext)
-            {
-                await _next(context);
-                return;
-            }
-
-            await using var tx = await dbContext.Database.BeginTransactionAsync();
-            try
-            {
-                await _next(context);
-
-                await tx.CommitAsync();
-            }
-            catch (Exception ex)
-            {
-                await tx.RollbackAsync();
-                if (_exceptionHandler is not null)
-                    await _exceptionHandler(sp, context, ex);
-                else
-                    throw;
-            }
+            await next(context);
+            await tx.CommitAsync();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
         }
     }
 }

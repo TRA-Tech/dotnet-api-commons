@@ -1,32 +1,29 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace ApiCommons.Middlewares.GlobalErrorHandler
+namespace ApiCommons.Middlewares.GlobalErrorHandler;
+
+public static class GlobalExceptionHandlerExtensions
 {
     /// <summary>
-    /// Provides extension methods for <see cref="IApplicationBuilder"/> to add the <see cref="GlobalErrorHandlerMiddleware"/> to the application's request pipeline.
+    /// Registers ProblemDetails services and <typeparamref name="THandler"/> as the
+    /// <see cref="IExceptionHandler"/> implementation.
+    /// Call <see cref="UseGlobalErrorHandler"/> on the <see cref="IApplicationBuilder"/> to activate.
     /// </summary>
-    public static class GlobalErrorHandlerAppBuilderExtensions
+    public static IServiceCollection AddGlobalExceptionHandler<THandler>(
+        this IServiceCollection services)
+        where THandler : class, IExceptionHandler
     {
-        /// <summary>
-        /// Adds a <see cref="GlobalErrorHandlerMiddleware"/> to the application's request pipeline.
-        /// </summary>
-        /// <param name="app">The <see cref="IApplicationBuilder"/> instance.</param>
-        /// <param name="exceptionHandler">The function to handle exceptions.</param>
-        /// <returns>The <see cref="IApplicationBuilder"/> instance.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when the app or exceptionHandler argument is null.</exception>
-        public static IApplicationBuilder UseGlobalErrorHandler(this IApplicationBuilder app, Func<IServiceProvider, HttpContext, Exception, Task> exceptionHandler)
-        {
-            if (app == null)
-            {
-                throw new ArgumentNullException(nameof(app));
-            }
-            if (exceptionHandler == null)
-            {
-                throw new ArgumentNullException(nameof(exceptionHandler));
-            }
-
-            return app.UseMiddleware<GlobalErrorHandlerMiddleware>(exceptionHandler);
-        }
+        services.AddProblemDetails();
+        services.AddExceptionHandler<THandler>();
+        return services;
     }
+
+    /// <summary>
+    /// Adds the ASP.NET Core exception handler middleware to the pipeline.
+    /// Must be called after <see cref="AddGlobalExceptionHandler{THandler}"/> during service registration.
+    /// </summary>
+    public static IApplicationBuilder UseGlobalErrorHandler(this IApplicationBuilder app)
+        => app.UseExceptionHandler();
 }

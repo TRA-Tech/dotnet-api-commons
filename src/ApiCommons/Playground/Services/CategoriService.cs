@@ -1,49 +1,53 @@
-﻿using ApiCommons.Extensions;
+using ApiCommons.Extensions;
 using ApiCommons.Pagination;
 using ApiCommons.Result;
 using Microsoft.EntityFrameworkCore;
 using Playground.Dtos.Category;
 using Playground.Entities;
 
-namespace Playground.Services
+namespace Playground.Services;
+
+public interface ICategoryService
 {
-    public interface ICategoryService
+    Task<Result<PagedResult<CategoryListItemDto>>> GetCategoriesPagedAsync(
+        SortedPagedRequest request, CancellationToken ct = default);
+
+    Task<Result<CategoryDetailDto>> GetByIdAsync(int id, CancellationToken ct = default);
+}
+
+public class CategoryService(NorthwindDbContext db) : ICategoryService
+{
+    public async Task<Result<PagedResult<CategoryListItemDto>>> GetCategoriesPagedAsync(
+        SortedPagedRequest request, CancellationToken ct = default)
     {
-        Task<Result<string, Exception>> GetDescriptionById(int id);
-        Task<Result<PagedResult<CategoryListItemDto>, Exception>> GetCategoriesPagedAsync(PagedRequest request, CancellationToken ct = default);
+        var query = db.Categories
+            .AsNoTracking()
+            .Select(c => new CategoryListItemDto
+            {
+                CategoryName = c.CategoryName,
+                Description  = c.Description
+            });
+
+        return await query.ToPagedAsync(request, ct);
     }
 
-    public class CategoryService : ICategoryService
+    public async Task<Result<CategoryDetailDto>> GetByIdAsync(int id, CancellationToken ct = default)
     {
-        private readonly NorthwindDbContext _northwindDbContext;
+        var category = await db.Categories
+            .AsNoTracking()
+            .Include(c => c.Products)
+            .FirstOrDefaultAsync(c => c.CategoryId == id, ct);
 
-        public CategoryService(NorthwindDbContext northwindDbContext)
+        if (category is null)
+            return new NotFoundError("Category");
+
+        return new CategoryDetailDto
         {
-            _northwindDbContext = northwindDbContext;
-        }
-
-        public async Task<Result<string, Exception>> GetDescriptionById(int id)
-        {
-            if (id == 0) return new ArgumentException("can not be zero", nameof(id));
-            var category = await _northwindDbContext.Categories.FindAsync(id);
-            if (category == null) return new Exception($"there is no category with id '{id}'");
-            return category.Description ?? string.Empty;
-        }
-
-        public async Task<Result<PagedResult<CategoryListItemDto>, Exception>> GetCategoriesPagedAsync(PagedRequest request, CancellationToken ct = default)
-        {
-            var query = _northwindDbContext.Categories
-                .AsNoTracking()
-                .OrderBy(c => c.CategoryId)
-                .Select(s => new CategoryListItemDto()
-                {
-                    CategoryName = s.CategoryName,
-                    Description = s.Description,
-                });
-
-            var page = await query.ToPagedAsync(request, ct);
-
-            return page;
-        }
+            CategoryId   = category.CategoryId,
+            CategoryName = category.CategoryName,
+            Description  = category.Description,
+            HasPicture   = category.Picture is { Length: > 0 },
+            ProductCount = category.Products.Count
+        };
     }
 }
